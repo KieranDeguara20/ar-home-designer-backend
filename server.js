@@ -10,6 +10,21 @@ const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 const furnitureTypes = ["chair", "stool", "table", "lamp"];
 
+const unsupportedFurnitureWords = [
+  "bed",
+  "sofa",
+  "couch",
+  "wardrobe",
+  "cabinet",
+  "shelf",
+  "bookshelf",
+  "tv",
+  "television",
+  "plant",
+  "rug",
+  "carpet"
+];
+
 const placeActionByObject = {
   chair: "PLACE_CHAIR",
   stool: "PLACE_STOOL",
@@ -203,6 +218,20 @@ function findMentionedObjects(text) {
   return [...new Set(found)];
 }
 
+function findUnsupportedFurnitureObjects(text) {
+  const t = normalizeCommandText(text);
+  const found = [];
+
+  for (const word of unsupportedFurnitureWords) {
+    const regex = new RegExp(`\\b${word}\\b`);
+    if (regex.test(t)) {
+      found.push(word);
+    }
+  }
+
+  return [...new Set(found)];
+}
+
 function getActionWord(hasPlaceVerb, hasRemoveVerb, hasRotateVerb) {
   if (hasPlaceVerb) return "place";
   if (hasRemoveVerb) return "remove";
@@ -333,6 +362,20 @@ function getDirectPlan(userText) {
   const wantsLeft = /\bleft\b/.test(t);
   const wantsRight = /\bright\b/.test(t);
   const mentionedObjects = findMentionedObjects(t);
+  const unsupportedObjects = findUnsupportedFurnitureObjects(t);
+
+  if (unsupportedObjects.length > 0) {
+    return {
+      type: "plan",
+      assistantText: "I can only place, remove, or rotate a chair, stool, table, or lamp in this prototype.",
+      commands: [
+        {
+          action: "MESSAGE_ONLY",
+          objectKey: ""
+        }
+      ]
+    };
+  }
 
   const hasClearVerb = /\b(clear|remove|delete)\b/.test(t);
   const wantsClearAll =
